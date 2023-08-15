@@ -29,33 +29,45 @@ def load_data(file_path):
 
 
 def handle_outliers(data, continuous_columns, method='capping', lower_bound_factor=1.5, upper_bound_factor=1.5):
-    if method == 'capping':
-        for var in continuous_columns:
-        column = data[var]
-        Q1 = column.quantile(0.25)
-        Q3 = column.quantile(0.75)
-        IQR = Q3 - Q1
-
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-
-        data_capped = column.clip(lower_bound, upper_bound)
-
-        data[var] = data_capped
+    """
+    Handle outliers in the continuous columns.
+    
+    Args:
+        data : Input DataFrame.
+        continuous_columns : List of continuous numerical columns.
+        lower_bound_factor: Factor for lower bound capping.
+        upper_bound_factor : Factor for upper bound capping.
         
+    Returns:
+        pd.DataFrame: DataFrame with outliers handled.
+    """
+    if method == 'capping':
+        data = data.copy()  
+        for var in continuous_columns:
+            column = data[var]
+            Q1 = column.quantile(0.25)
+            Q3 = column.quantile(0.75)
+            IQR = Q3 - Q1
+
+            lower_bound = Q1 - lower_bound_factor * IQR
+            upper_bound = Q3 + upper_bound_factor * IQR
+
+            data.loc[:, var] = column.clip(lower_bound, upper_bound)
+            
         return data
     elif method == 'other_method':
         # todo
+        pass
     else:
         raise ValueError("Invalid outlier handling method specified.")
-
+        
 
 # In[16]:
 
 
 def handle_null_values(data):
     # Check for null values and drop rows with null values
-    if data.isnull().any().any():
+    if data.isnull().values.any():
         data = data.dropna()
     return data
 
@@ -91,17 +103,17 @@ def extract_continuous_variables(data, threshold=8):
         threshold : Threshold to distinguish continuous from discrete variables.
         
     Returns:
-        set: Set of continuous numerical columns.
+        list: list of continuous numerical columns.
     """
     numeric_columns = data.select_dtypes(include=['float64', 'int64']).columns
     
-    continuous_variables = set()
+    continuous_variables = []
     for column in numeric_columns:
         unique_values = data[column].nunique()
         if unique_values >= threshold:
-            continuous_variables.add(column)
+            continuous_variables.append(column)
     
-    return continuous_variables
+    return list(continuous_variables)
 
 
 # In[18]:
@@ -119,8 +131,8 @@ def extract_categorical_variables(data, min_unique_values=3, max_unique_values=4
     Returns:
         list: List of categorical variables.
     """
-    unique_value_counts = data.select_dtypes(include='object').nunique()
-    categorical_variables = unique_value_counts[(unique_value_counts > min_unique_values) & (unique_value_counts <= max_unique_values)].index.tolist()
+    unique_value_counts =  data.nunique()
+    categorical_variables = unique_value_counts[(unique_value_counts > 2) & (unique_value_counts < 5)].index.tolist()
     return categorical_variables
 
 
@@ -138,12 +150,8 @@ def encode_categorical(data, categorical_columns):
     Returns:
         pd.DataFrame: DataFrame with one-hot encoded categorical columns.
     """
-    encoded_data = data.copy()
-    
-    for column in categorical_columns:
-        encoded_column = pd.get_dummies(encoded_data[column], prefix=column, drop_first=True)
-        encoded_data = pd.concat([encoded_data, encoded_column], axis=1)
-        encoded_data.drop(column, axis=1, inplace=True)
+    data = data.copy()
+    encoded_data = pd.get_dummies(data, columns=categorical_columns, drop_first=True)
     
     return encoded_data
 
@@ -221,13 +229,13 @@ def save_processed_data(X_train, y_train, X_test, y_test, output_path):
     Args:
         X_train : Preprocessed training features.
         y_train : Preprocessed training target.
-        X_val : Preprocessed testing features.
-        y_val : Preprocessed testing target.
+        X_test : Preprocessed testing features.
+        y_test : Preprocessed testing target.
         output_path : Path to save the data.
     """
     
     X_train.to_csv(output_path + '/X_train.csv', index=False)
     y_train.to_csv(output_path + '/y_train.csv', index=False)
-    X_val.to_csv(output_path + '/X_test.csv', index=False)
-    y_val.to_csv(output_path + '/y_test.csv', index=False)
+    X_test.to_csv(output_path + '/X_test.csv', index=False)
+    y_test.to_csv(output_path + '/y_test.csv', index=False)
 
